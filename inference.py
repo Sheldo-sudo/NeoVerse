@@ -10,7 +10,7 @@ from diffsynth.utils.auxiliary import CameraTrajectory, load_video, homo_matrix_
 
 @torch.no_grad()
 def generate_video(pipe, input_video, prompt, negative_prompt, cam_traj: CameraTrajectory,
-                   save_dir="outputs", alpha_threshold=1.0, static_flag=False,
+                   output_path="outputs/output.mp4", alpha_threshold=1.0, static_flag=False,
                    seed=42, cfg_scale=1.0, num_inference_steps=4):
     device = pipe.device
     height, width = input_video[0].size[1], input_video[0].size[0]
@@ -72,7 +72,7 @@ def generate_video(pipe, input_video, prompt, negative_prompt, cam_traj: CameraT
         cfg_scale=cfg_scale, num_inference_steps=num_inference_steps, tiled=False,
         **wrapped_data,
     )
-    save_video(generated_frames, os.path.join(save_dir, f"{cam_traj.name}.mp4"), fps=16)
+    save_video(generated_frames, output_path, fps=16)
 
 
 def parse_args():
@@ -108,9 +108,9 @@ def parse_args():
                         help="Only validate trajectory file, don't run inference")
 
     # Input/output
-    parser.add_argument("--video", help="Input video path or image directory")
-    parser.add_argument("--output_dir", default="outputs",
-                        help="Output directory (default: outputs)")
+    parser.add_argument("--input_path", help="Input video or image path")
+    parser.add_argument("--output_path", default="outputs/inference.mp4",
+                        help="Output video path (default: outputs/inference.mp4)")
     parser.add_argument("--prompt", default="A smooth video with complete scene content. Inpaint any missing regions or margins naturally to match the surrounding scene.",
                         help="Text prompt for generation")
     parser.add_argument("--negative_prompt", default="",
@@ -180,8 +180,8 @@ def main():
             return 1
 
     # --- Normal inference mode ---
-    if args.video is None:
-        print("Error: --video is required for inference")
+    if args.input_path is None:
+        print("Error: --input_path is required for inference")
         return 1
 
     torch.manual_seed(args.seed)
@@ -213,19 +213,21 @@ def main():
     print("Model loaded!")
 
     # Load video
-    print(f"Loading video from {args.video}...")
-    images = load_video(args.video, args.num_frames,
+    print(f"Loading video from {args.input_path}...")
+    images = load_video(args.input_path, args.num_frames,
                         resolution=(args.width, args.height),
                         resize_mode=args.resize_mode,
                         static_scene=args.static_scene)
 
     # Run inference
-    save_dir = args.output_dir or "outputs"
-    os.makedirs(save_dir, exist_ok=True)
+    output_path = args.output_path
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
     if args.vis_rendering:
-        # Set up directory for rendering visualizations
-        pipe.save_root = save_dir
+        # Save rendering visualizations to a folder named after the output (without extension)
+        vis_dir = os.path.splitext(output_path)[0]
+        os.makedirs(vis_dir, exist_ok=True)
+        pipe.save_root = vis_dir
 
     print(f"Generating with trajectory: {cam_traj.name} (mode={cam_traj.mode})")
     generate_video(
@@ -234,14 +236,14 @@ def main():
         prompt=args.prompt,
         negative_prompt=args.negative_prompt,
         cam_traj=cam_traj,
-        save_dir=save_dir,
+        output_path=output_path,
         alpha_threshold=args.alpha_threshold,
         static_flag=args.static_scene,
         seed=args.seed,
         cfg_scale=cfg_scale,
         num_inference_steps=num_inference_steps,
     )
-    print(f"Done! Output saved to: {save_dir}")
+    print(f"Done! Output saved to: {output_path}")
     return 0
 
 

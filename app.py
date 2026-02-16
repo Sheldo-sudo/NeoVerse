@@ -375,8 +375,8 @@ with gr.Blocks(theme=theme, title="NeoVerse Interactive Demo") as demo:
         <li><strong>Reconstruct</strong> &mdash; Click "Reconstruct" to perform 4D reconstruction. The middle column visualises the scene as a Gaussian-Splatting-centred point cloud so you can inspect the spatial layout and camera scale.</li>
         <li><strong>Design Camera Trajectory</strong> &mdash; Two input modes are available under the <em>Camera Parameters</em> and <em>Trajectory File</em> tabs:
             <ul>
-                <li><em>Camera Parameters</em>: select a camera motion type (pan, tilt, orbit, push, etc.) and adjust angle, distance, and orbit radius with the sliders.</li>
-                <li><em>Trajectory File</em>: upload a trajectory JSON file for full control over keyframes.</li>
+                <li><em>Camera Parameters</em>: select a camera motion type (pan, tilt, orbit, push, etc.) and adjust angle, distance, and orbit radius with the sliders. The coordinate convention is detailed in<a href="https://github.com/IamCreateAI/NeoVerse/blob/main/docs/coordinate_system.md">Coordinate System</a>.</li>
+                <li><em>Trajectory File</em>: upload a trajectory JSON file for full control over keyframes. The format is described in<a href="https://github.com/IamCreateAI/NeoVerse/blob/main/docs/trajectory_format.md">Trajectory Format</a>.</li>
             </ul>
             Click "Render" to preview RGB and mask renderings of the planned path.
         </li>

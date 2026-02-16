@@ -159,7 +159,21 @@ def load_video(data, num_frames, resolution=(560, 336), resize_mode="center_crop
             return image.resize(resolution, resample=Image.LANCZOS)
         return center_crop(image, resolution)
 
-    if isinstance(data, str) and os.path.isdir(data):
+    assert isinstance(data, (str, list)), f"data must be a string path or a list of image paths, got {type(data)}"
+    if isinstance(data, str) and data.endswith((".jpg", ".jpeg", ".png")):
+        data = [data]
+
+    if isinstance(data, list):
+        image_paths = sorted(data)
+        end_index = min(len(image_paths), num_frames)
+        if static_scene:
+            sample_indices = np.arange(end_index)
+        else:
+            sample_indices = np.linspace(0, end_index - 1, num_frames, dtype=int)
+        images = []
+        for idx in sample_indices:
+            images.append(_process_frame(Image.open(image_paths[idx])))
+    elif os.path.isdir(data):
         image_names = sorted(os.listdir(data))
         end_index = min(len(image_names), num_frames)
         if static_scene:
@@ -170,17 +184,7 @@ def load_video(data, num_frames, resolution=(560, 336), resize_mode="center_crop
         for idx in sample_indices:
             img_path = os.path.join(data, image_names[idx])
             images.append(_process_frame(Image.open(img_path)))
-    elif isinstance(data, list):
-        image_paths = sorted(data)
-        end_index = min(len(image_paths), num_frames)
-        if static_scene:
-            sample_indices = np.arange(end_index)
-        else:
-            sample_indices = np.linspace(0, end_index - 1, num_frames, dtype=int)
-        images = []
-        for idx in sample_indices:
-            images.append(_process_frame(Image.open(image_paths[idx])))
-    elif isinstance(data, str) and os.path.isfile(data):
+    elif os.path.isfile(data):
         video_reader = VideoReader(data)
         end_index = min(len(video_reader), num_frames)
         if static_scene:
