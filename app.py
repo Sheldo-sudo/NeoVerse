@@ -164,7 +164,6 @@ def reconstruct(state):
     # Build GLB: 11-frame point cloud, all S cameras shown
     scene = build_scene_glb(points, colors, frame_indices, input_cam2world.cpu().numpy())
     glb_path = _export_scene(scene)
-
     return state, glb_path, gr.update(interactive=True)
 
 
@@ -247,8 +246,11 @@ def preview(state, selected_tab, t_file, t_type, angle, distance, orbit_r,
     static_flag = state.get("scene_type", "General scene") == "Static scene"
     input_cam2world = state["input_cam2world"]
     target_cam2world = cam_traj.c2w.to(device)
-    if cam_traj.mode == "relative" and not static_flag:
-        target_cam2world = input_cam2world @ target_cam2world
+    if cam_traj.mode == "relative":
+        if static_flag:
+            target_cam2world = input_cam2world[0:1] @ target_cam2world
+        else:
+            target_cam2world = input_cam2world @ target_cam2world
 
     scene = build_scene_glb(state["points"], state["colors"], state["frame_indices"],
                             target_cam2world.cpu().numpy())
@@ -429,7 +431,7 @@ with gr.Blocks(theme=theme, title="NeoVerse Interactive Demo") as demo:
                     mask_video = gr.Video(label="Mask Rendering", height=170)
 
             with gr.Tabs() as traj_tabs:
-                with gr.Tab("Camera Parameters", id=TAB_CAMERA_PARAMS):
+                with gr.Tab("Camera Parameters", id=TAB_CAMERA_PARAMS) as tab_camera:
                     with gr.Row():
                         traj_type = gr.Dropdown(choices=VALID_TYPES, value="static",
                                                 label="Camera Motion")
@@ -439,7 +441,7 @@ with gr.Blocks(theme=theme, title="NeoVerse Interactive Demo") as demo:
                                                   step=0.01, label="Distance")
                         traj_orbit = gr.Slider(minimum=0, maximum=2, value=0,
                                                step=0.1, label="Orbit Radius")
-                with gr.Tab("Trajectory File", id=TAB_TRAJ_FILE):
+                with gr.Tab("Trajectory File", id=TAB_TRAJ_FILE) as tab_traj:
                     traj_upload = gr.File(
                         label="Upload Trajectory JSON",
                         file_types=[".json"],
@@ -504,9 +506,8 @@ with gr.Blocks(theme=theme, title="NeoVerse Interactive Demo") as demo:
                      outputs=[traj_angle, traj_distance, traj_orbit])
 
     # Track selected tab via state
-    def _on_tab_select(evt: gr.SelectData):
-        return evt.value
-    traj_tabs.select(fn=_on_tab_select, inputs=[], outputs=[selected_tab_state])
+    tab_camera.select(fn=lambda: TAB_CAMERA_PARAMS, inputs=[], outputs=[selected_tab_state])
+    tab_traj.select(fn=lambda: TAB_TRAJ_FILE, inputs=[], outputs=[selected_tab_state])
 
     # Upload
     file_upload.upload(fn=handle_upload,

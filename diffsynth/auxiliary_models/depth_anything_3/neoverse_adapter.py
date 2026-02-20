@@ -57,7 +57,9 @@ class DepthAnything3Reconstructor(nn.Module):
         # Extract camera parameters
         # DA3 outputs w2c extrinsics; invert to get c2w
         w2c = as_homogeneous(da3_output.extrinsics)  # [B, S, 4, 4]
-        c2w = affine_inverse(w2c)  # [B, S, 4, 4]
+        # Convert camera pose to first camera coordinate system
+        c2w = w2c[:, :1] @ affine_inverse(w2c)  # [B, S, 4, 4]
+        c2w = c2w.float()
         intrinsics = da3_output.intrinsics  # [B, S, 3, 3]
 
         # Unproject depth to 3D world coordinates
@@ -103,7 +105,7 @@ class DepthAnything3Reconstructor(nn.Module):
 
         predictions = {
             "splats": splats,
-            "rendered_extrinsics": as_homogeneous(c2w),  # [B, S, 4, 4] c2w
+            "rendered_extrinsics": c2w,  # [B, S, 4, 4]
             "rendered_intrinsics": intrinsics,  # [B, S, 3, 3]
             "rendered_timestamps": timestamps,  # [B, S]
         }
