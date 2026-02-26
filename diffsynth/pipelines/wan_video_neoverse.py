@@ -174,6 +174,7 @@ class WanVideoNeoVersePipeline(BasePipeline):
                 ),
             )
         if self.control_branch is not None:
+            dtype = next(iter(self.control_branch.parameters())).dtype
             device = "cpu" if vram_limit is not None else self.device
             enable_vram_management(
                 self.control_branch,
@@ -241,18 +242,19 @@ class WanVideoNeoVersePipeline(BasePipeline):
         pipeline_kwargs: dict = {},
         lora_path: Optional[str] = None,
         lora_alpha: float = 1.0,
-        device: Union[str, torch.device] = "cpu",
+        device: Union[str, torch.device] = "cuda",
         torch_dtype: torch.dtype = torch.bfloat16,
+        enable_vram_management: bool = False,
     ):
         # Initialize pipeline
         pipe = WanVideoNeoVersePipeline(device=device, torch_dtype=torch_dtype, pipeline_kwargs=pipeline_kwargs)
 
         # Load models
         model_configs = [
-            ModelConfig(path=reconstructor_path),
-            ModelConfig(local_model_path=local_model_path, model_id="NeoVerse", origin_file_pattern="diffusion_pytorch_model*.safetensors"),
-            ModelConfig(local_model_path=local_model_path, model_id="NeoVerse", origin_file_pattern="models_t5_umt5-xxl-enc-bf16.pth"),
-            ModelConfig(local_model_path=local_model_path, model_id="NeoVerse", origin_file_pattern="Wan2.1_VAE.pth"),
+            ModelConfig(path=reconstructor_path, offload_device="cpu" if enable_vram_management else device),
+            ModelConfig(local_model_path=local_model_path, model_id="NeoVerse", origin_file_pattern="diffusion_pytorch_model*.safetensors", offload_device="cpu" if enable_vram_management else device),
+            ModelConfig(local_model_path=local_model_path, model_id="NeoVerse", origin_file_pattern="models_t5_umt5-xxl-enc-bf16.pth", offload_device="cpu" if enable_vram_management else device),
+            ModelConfig(local_model_path=local_model_path, model_id="NeoVerse", origin_file_pattern="Wan2.1_VAE.pth", offload_device="cpu" if enable_vram_management else device),
         ]
         tokenizer_config = ModelConfig(local_model_path=local_model_path, model_id="NeoVerse", origin_file_pattern="google/*")
         model_manager = ModelManager()
@@ -286,6 +288,9 @@ class WanVideoNeoVersePipeline(BasePipeline):
             assert os.path.exists(lora_path), f"LoRA path {lora_path} does not exist."
             pipe.load_lora(pipe.dit, lora_path, alpha=lora_alpha, lora_type="lightx2v")
             print(f"Loaded LoRA from {lora_path}")
+
+        if enable_vram_management:
+            pipe.enable_vram_management()
         return pipe
 
 

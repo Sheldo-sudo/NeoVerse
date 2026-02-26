@@ -17,6 +17,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--reconstructor_path", type=str,
                     default="models/NeoVerse/reconstructor.ckpt",
                     help="Path to reconstructor checkpoint")
+parser.add_argument("--low_vram", action="store_true",
+                    help="Enable low-VRAM mode with model offloading")
 args, _ = parser.parse_known_args()
 
 # ---------------------------------------------------------------------------
@@ -36,8 +38,10 @@ pipe = WanVideoNeoVersePipeline.from_pretrained(
     reconstructor_path=args.reconstructor_path,
     lora_path="models/NeoVerse/loras/Wan21_T2V_14B_lightx2v_cfg_step_distill_lora_rank64.safetensors",
     lora_alpha=1.0,
+    device=device,
     torch_dtype=torch.bfloat16,
-).to(device)
+    enable_vram_management=args.low_vram,
+)
 print("Pipeline loaded.")
 
 
@@ -140,8 +144,18 @@ def reconstruct(state):
     else:
         views["is_static"] = torch.zeros((1, S), dtype=torch.bool, device=device)
         views["timestamp"] = torch.arange(0, S, dtype=torch.int64, device=device).unsqueeze(0)
+
+    # Low-VRAM: load reconstructor to GPU before use
+    if pipe.vram_management_enabled:
+        pipe.reconstructor.to(device)
+
     with torch.amp.autocast("cuda", dtype=pipe.torch_dtype):
         predictions = pipe.reconstructor(views, is_inference=True, use_motion=False)
+
+    # Low-VRAM: offload reconstructor back to CPU
+    if pipe.vram_management_enabled:
+        pipe.reconstructor.cpu()
+        torch.cuda.empty_cache()
 
     gaussians = predictions["splats"]
     input_intrs = predictions["rendered_intrinsics"][0]        # [S, 3, 3]

@@ -183,6 +183,7 @@ python inference.py --trajectory_file my_trajectory.json --validate_only
 | `--num_frames` | `81` | Number of output frames |
 | `--height` / `--width` | `336` / `560` | Output resolution |
 | `--disable_lora` | off | Use full 50-step inference instead of 4-step distilled LoRA |
+| `--low_vram` | off | Enable low-VRAM mode with model offloading (see below) |
 | `--vis_rendering` | off | Save target-trajectory rendering visualizations alongside the output |
 | `--seed` | `42` | Random seed |
 
@@ -192,12 +193,17 @@ python inference.py --trajectory_file my_trajectory.json --validate_only
 
 **Alpha Threshold** (`--alpha_threshold`) — After rendering the target viewpoint from the reconstructed 3D scene, pixels with alpha below this threshold are masked out and repainted by the diffusion model. Default `1.0` keeps all regions re-painted.
 
+**Low-VRAM Mode** (`--low_vram`) — Enables model offloading to reduce peak GPU memory usage. In this mode, models are kept on CPU and only loaded to GPU when needed (e.g., the reconstructor is loaded for reconstruction then offloaded, the diffusion model is loaded for denoising then offloaded). This significantly reduces peak VRAM at the cost of slower inference due to CPU-GPU data transfers. The default mode has ~47 GB allocated on GPU (`torch.cuda.memory_allocated`) with a peak of ~74 GB (`torch.cuda.max_memory_allocated`), while `--low_vram` keeps only ~1 GB allocated and reduces the peak to ~38 GB.
+
 ### Interactive Demo (Gradio)
 
 Launch the web UI:
 
 ```bash
 python app.py
+
+# With low-VRAM mode
+python app.py --low_vram
 ```
 
 The demo walks you through four steps:

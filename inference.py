@@ -24,8 +24,19 @@ def generate_video(pipe, input_video, prompt, negative_prompt, cam_traj: CameraT
     else:
         views["is_static"] = torch.zeros((1, len(input_video)), dtype=torch.bool, device=device)
         views["timestamp"] = torch.arange(0, len(input_video), dtype=torch.int64, device=device).unsqueeze(0)
+
+    # Low-VRAM: load reconstructor to GPU before use
+    if pipe.vram_management_enabled:
+        pipe.reconstructor.to(device)
+
     with torch.amp.autocast("cuda", dtype=pipe.torch_dtype):
         predictions = pipe.reconstructor(views, is_inference=True, use_motion=False)
+
+    # Low-VRAM: offload reconstructor back to CPU
+    if pipe.vram_management_enabled:
+        pipe.reconstructor.cpu()
+        torch.cuda.empty_cache()
+
     gaussians = predictions["splats"]
     K = predictions["rendered_intrinsics"][0]
     input_cam2world = predictions["rendered_extrinsics"][0]
@@ -143,6 +154,8 @@ def parse_args():
                         help="Enable static scene mode")
     parser.add_argument("--vis_rendering", action="store_true",
                         help="Save intermediate rendering visualizations")
+    parser.add_argument("--low_vram", action="store_true",
+                        help="Enable low-VRAM mode with model offloading (reduces peak VRAM usage)")
 
     return parser.parse_args()
 
@@ -208,8 +221,10 @@ def main():
         reconstructor_path=args.reconstructor_path,
         lora_path=lora_path,
         lora_alpha=1.0,
+        device="cuda",
         torch_dtype=torch.bfloat16,
-    ).to("cuda")
+        enable_vram_management=args.low_vram,
+    )
     print("Model loaded!")
 
     # Load video
